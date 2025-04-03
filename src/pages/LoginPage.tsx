@@ -37,13 +37,13 @@ const LoginPage: React.FC = () => {
             Atlantic City Casino
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your credentials to access the management system
+            Ingresa tus credenciales para acceder al sistema de gestión
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username">Usuario</Label>
               <Input
                 id="username"
                 placeholder="admin"
@@ -53,7 +53,7 @@ const LoginPage: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
@@ -63,7 +63,7 @@ const LoginPage: React.FC = () => {
                 required
               />
               <p className="text-xs text-muted-foreground mt-2">
-                Demo credentials: username: admin, password: password
+                Credenciales de demostración: usuario: admin, contraseña: password
               </p>
             </div>
           </CardContent>
@@ -73,7 +73,7 @@ const LoginPage: React.FC = () => {
               className="w-full bg-primary hover:bg-primary/90"
               disabled={isLoading}
             >
-              {isLoading ? "Logging in..." : "Login"}
+              {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
           </CardFooter>
         </form>

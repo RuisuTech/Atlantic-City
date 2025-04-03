@@ -12,14 +12,14 @@ const Header: React.FC = () => {
   return (
     <header className="bg-card border-b border-border p-4 flex justify-between items-center">
       <div>
-        <h2 className="text-lg font-medium">Welcome, {user?.username}</h2>
+        <h2 className="text-lg font-medium">Bienvenido, {user?.username}</h2>
       </div>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
           onClick={toggleTheme}
-          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
         >
           {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
         </Button>
@@ -27,7 +27,7 @@ const Header: React.FC = () => {
           variant="outline"
           size="icon"
           onClick={logout}
-          title="Logout"
+          title="Cerrar sesión"
         >
           <LogOut size={18} />
         </Button>

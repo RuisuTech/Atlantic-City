@@ -51,7 +51,7 @@ const DashboardPage: React.FC = () => {
         .reduce((sum, t) => sum + t.amount, 0);
       
       return {
-        name: new Date(date).toLocaleDateString("en-US", { weekday: "short" }),
+        name: new Date(date).toLocaleDateString("es-ES", { weekday: "short" }),
         deposits,
         withdrawals
       };
@@ -62,34 +62,34 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <h1 className="text-3xl font-bold">Inicio</h1>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard 
-          title="Total Clients" 
+          title="Total Clientes" 
           value={clientCount} 
-          description={`${activeClientCount} active`}
+          description={`${activeClientCount} activos`}
           icon={<Users className="h-6 w-6" />}
           color="bg-blue-100 dark:bg-blue-900"
         />
         <StatCard 
-          title="Total Tickets" 
+          title="Total Boletas" 
           value={ticketCount} 
-          description="Deposits & withdrawals"
+          description="Depósitos y retiros"
           icon={<Receipt className="h-6 w-6" />}
           color="bg-green-100 dark:bg-green-900"
         />
         <StatCard 
-          title="Total Balance" 
+          title="Balance Total" 
           value={`$${totalBalance.toLocaleString()}`} 
-          description="Current holdings"
+          description="Fondos actuales"
           icon={<CircleDollarSign className="h-6 w-6" />}
           color="bg-yellow-100 dark:bg-yellow-900"
         />
         <StatCard 
-          title="Avg. Per Client" 
+          title="Prom. por Cliente" 
           value={clientCount ? `$${(totalBalance / clientCount).toFixed(2)}` : "$0"} 
-          description="Average balance"
+          description="Balance promedio"
           icon={<TrendingUp className="h-6 w-6" />}
           color="bg-purple-100 dark:bg-purple-900"
         />
@@ -98,8 +98,8 @@ const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Transaction Activity (Last 7 Days)</CardTitle>
-            <CardDescription>Daily deposits and withdrawals</CardDescription>
+            <CardTitle>Actividad de Transacciones (Últimos 7 Días)</CardTitle>
+            <CardDescription>Depósitos y retiros diarios</CardDescription>
           </CardHeader>
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
@@ -108,8 +108,8 @@ const DashboardPage: React.FC = () => {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="deposits" name="Deposits" fill="#4ade80" />
-                <Bar dataKey="withdrawals" name="Withdrawals" fill="#f87171" />
+                <Bar dataKey="deposits" name="Depósitos" fill="#4ade80" />
+                <Bar dataKey="withdrawals" name="Retiros" fill="#f87171" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -117,8 +117,8 @@ const DashboardPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Transactions</CardTitle>
-            <CardDescription>Latest deposit and withdrawal activities</CardDescription>
+            <CardTitle>Transacciones Recientes</CardTitle>
+            <CardDescription>Últimas actividades de depósito y retiro</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -131,9 +131,9 @@ const DashboardPage: React.FC = () => {
                       className="flex justify-between items-center p-3 rounded-md bg-accent/50"
                     >
                       <div>
-                        <p className="font-medium">{client?.name || "Unknown Client"}</p>
+                        <p className="font-medium">{client?.name || "Cliente Desconocido"}</p>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(ticket.date).toLocaleString()}
+                          {new Date(ticket.date).toLocaleString('es-ES')}
                         </p>
                       </div>
                       <div className={`font-medium ${ticket.type === "Deposit" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
@@ -143,7 +143,7 @@ const DashboardPage: React.FC = () => {
                   );
                 })
               ) : (
-                <p className="text-center text-muted-foreground py-4">No recent transactions</p>
+                <p className="text-center text-muted-foreground py-4">No hay transacciones recientes</p>
               )}
             </div>
           </CardContent>

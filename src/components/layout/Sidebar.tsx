@@ -15,9 +15,9 @@ const Sidebar: React.FC = () => {
       </div>
       <nav className="p-4">
         <ul className="space-y-2">
-          <NavItem to="/dashboard" icon={<Home size={20} />} label="Dashboard" />
-          <NavItem to="/clients" icon={<Users size={20} />} label="Clients" />
-          <NavItem to="/tickets" icon={<Receipt size={20} />} label="Tickets" />
+          <NavItem to="/dashboard" icon={<Home size={20} />} label="Inicio" />
+          <NavItem to="/clients" icon={<Users size={20} />} label="Clientes" />
+          <NavItem to="/tickets" icon={<Receipt size={20} />} label="Boletas" />
         </ul>
       </nav>
     </aside>

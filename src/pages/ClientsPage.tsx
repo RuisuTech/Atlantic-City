@@ -94,7 +94,7 @@ const ClientsPage: React.FC = () => {
     
     // Validate form
     if (!formData.name.trim() || !formData.dni.trim()) {
-      toast.error("All fields are required");
+      toast.error("Todos los campos son obligatorios");
       return;
     }
     
@@ -104,7 +104,7 @@ const ClientsPage: React.FC = () => {
       : ClientManager.isUniqueDni(formData.dni);
     
     if (!isDniUnique) {
-      toast.error("DNI must be unique");
+      toast.error("El DNI debe ser único");
       return;
     }
     
@@ -120,7 +120,7 @@ const ClientsPage: React.FC = () => {
       
       ClientManager.updateClient(updatedClient);
       setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-      toast.success("Client updated successfully");
+      toast.success("Cliente actualizado correctamente");
     } else {
       // Add new client
       const newClient = ClientManager.addClient({
@@ -131,7 +131,7 @@ const ClientsPage: React.FC = () => {
       });
       
       setClients(prev => [...prev, newClient]);
-      toast.success("Client added successfully");
+      toast.success("Cliente agregado correctamente");
     }
     
     setIsDialogOpen(false);
@@ -154,9 +154,9 @@ const ClientsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Client Management</h1>
+        <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
         <Button onClick={openAddDialog}>
-          <Plus className="mr-2 h-4 w-4" /> Add Client
+          <Plus className="mr-2 h-4 w-4" /> Agregar Cliente
         </Button>
       </div>
       
@@ -164,7 +164,7 @@ const ClientsPage: React.FC = () => {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search clients..."
+            placeholder="Buscar clientes..."
             className="pl-8"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -177,12 +177,12 @@ const ClientsPage: React.FC = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
+                <TableHead>Nombre</TableHead>
                 <TableHead>DNI</TableHead>
-                <TableHead>Membership</TableHead>
+                <TableHead>Membresía</TableHead>
                 <TableHead>Balance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -240,7 +240,7 @@ const ClientsPage: React.FC = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-6">
-                    {searchTerm ? "No clients found" : "No clients yet. Add your first client!"}
+                    {searchTerm ? "No se encontraron clientes" : "No hay clientes aún. ¡Agrega tu primer cliente!"}
                   </TableCell>
                 </TableRow>
               )}
@@ -253,12 +253,12 @@ const ClientsPage: React.FC = () => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingClient ? "Edit Client" : "Add New Client"}
+              {editingClient ? "Editar Cliente" : "Agregar Nuevo Cliente"}
             </DialogTitle>
             <DialogDescription>
               {editingClient 
-                ? "Update the client's information below."
-                : "Fill in the client's details to add them to the system."
+                ? "Actualiza la información del cliente a continuación."
+                : "Completa los detalles del cliente para agregarlo al sistema."
               }
             </DialogDescription>
           </DialogHeader>
@@ -266,11 +266,11 @@ const ClientsPage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name">Nombre Completo</Label>
                 <Input
                   id="name"
                   name="name"
-                  placeholder="John Doe"
+                  placeholder="Juan Pérez"
                   value={formData.name}
                   onChange={handleInputChange}
                   required
@@ -278,7 +278,7 @@ const ClientsPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="dni">DNI (ID Number)</Label>
+                <Label htmlFor="dni">DNI (Número de Identificación)</Label>
                 <Input
                   id="dni"
                   name="dni"
@@ -290,13 +290,13 @@ const ClientsPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="membershipType">Membership Type</Label>
+                <Label htmlFor="membershipType">Tipo de Membresía</Label>
                 <Select 
                   value={formData.membershipType} 
                   onValueChange={handleSelectChange}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select membership type" />
+                    <SelectValue placeholder="Seleccionar tipo de membresía" />
                   </SelectTrigger>
                   <SelectContent>
                     {MEMBERSHIP_TYPES.map((type) => (
@@ -314,13 +314,13 @@ const ClientsPage: React.FC = () => {
                   checked={formData.active}
                   onCheckedChange={handleSwitchChange}
                 />
-                <Label htmlFor="active">Active client</Label>
+                <Label htmlFor="active">Cliente activo</Label>
               </div>
             </div>
             
             <DialogFooter>
               <Button type="submit">
-                {editingClient ? "Save Changes" : "Add Client"}
+                {editingClient ? "Guardar Cambios" : "Agregar Cliente"}
               </Button>
             </DialogFooter>
           </form>
