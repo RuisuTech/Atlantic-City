@@ -3,22 +3,22 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { ClientManager, Client, MembershipType } from "@/models/Client";
 import { TicketManager } from "@/models/Ticket";
-import { Search, Plus, Edit, ArrowRight } from "lucide-react";
+import { Search, Plus, Edit, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const MEMBERSHIP_TYPES: MembershipType[] = ["Regular", "Silver", "Gold", "VIP", "Platinum"];
 
 const ClientsPage: React.FC = () => {
-  const [clients, setClients] = useState<Client[]>([]);
-  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -30,29 +30,80 @@ const ClientsPage: React.FC = () => {
     active: true
   });
 
-  // Load clients from local storage
-  useEffect(() => {
-    const loadedClients = ClientManager.getAllClients();
-    setClients(loadedClients);
-    setFilteredClients(loadedClients);
-  }, []);
+  // Fetch clients using React Query
+  const { 
+    data: clients = [], 
+    isLoading: isLoadingClients,
+    error: clientsError
+  } = useQuery({
+    queryKey: ['clients'],
+    queryFn: ClientManager.getAllClients
+  });
+
+  // Calculate balances for each client
+  const { 
+    data: clientBalances = {}, 
+    isLoading: isLoadingBalances 
+  } = useQuery({
+    queryKey: ['clientBalances'],
+    queryFn: async () => {
+      const balances: Record<number, number> = {};
+      for (const client of clients) {
+        balances[client.id] = await TicketManager.getBalanceByClientId(client.id);
+      }
+      return balances;
+    },
+    enabled: clients.length > 0
+  });
+
+  // Add client mutation
+  const addClientMutation = useMutation({
+    mutationFn: ClientManager.addClient,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success("Cliente agregado correctamente");
+      setIsDialogOpen(false);
+    },
+    onError: () => {
+      toast.error("Error al agregar cliente");
+    }
+  });
+
+  // Update client mutation
+  const updateClientMutation = useMutation({
+    mutationFn: ClientManager.updateClient,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success("Cliente actualizado correctamente");
+      setIsDialogOpen(false);
+    },
+    onError: () => {
+      toast.error("Error al actualizar cliente");
+    }
+  });
+
+  // Toggle client status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: ClientManager.toggleClientStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+    },
+    onError: () => {
+      toast.error("Error al cambiar estado del cliente");
+    }
+  });
 
   // Filter clients based on search term
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredClients(clients);
-      return;
-    }
+  const filteredClients = clients.filter(client => {
+    if (!searchTerm.trim()) return true;
     
     const lowerSearch = searchTerm.toLowerCase();
-    const filtered = clients.filter(
-      client => 
-        client.name.toLowerCase().includes(lowerSearch) ||
-        client.dni.toLowerCase().includes(lowerSearch) ||
-        client.membershipType.toLowerCase().includes(lowerSearch)
+    return (
+      client.name.toLowerCase().includes(lowerSearch) ||
+      client.dni.toLowerCase().includes(lowerSearch) ||
+      client.membershipType.toLowerCase().includes(lowerSearch)
     );
-    setFilteredClients(filtered);
-  }, [searchTerm, clients]);
+  });
 
   const openAddDialog = () => {
     setEditingClient(null);
@@ -89,7 +140,7 @@ const ClientsPage: React.FC = () => {
     setFormData(prev => ({ ...prev, active: checked }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form
@@ -99,9 +150,10 @@ const ClientsPage: React.FC = () => {
     }
     
     // Check for unique DNI
-    const isDniUnique = editingClient 
-      ? ClientManager.isUniqueDni(formData.dni, editingClient.id)
-      : ClientManager.isUniqueDni(formData.dni);
+    const isDniUnique = await ClientManager.isUniqueDni(
+      formData.dni, 
+      editingClient?.id
+    );
     
     if (!isDniUnique) {
       toast.error("El DNI debe ser único");
@@ -110,46 +162,38 @@ const ClientsPage: React.FC = () => {
     
     if (editingClient) {
       // Update existing client
-      const updatedClient = {
+      updateClientMutation.mutate({
         ...editingClient,
         name: formData.name,
         dni: formData.dni,
         membershipType: formData.membershipType,
         active: formData.active
-      };
-      
-      ClientManager.updateClient(updatedClient);
-      setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
-      toast.success("Cliente actualizado correctamente");
+      });
     } else {
       // Add new client
-      const newClient = ClientManager.addClient({
+      addClientMutation.mutate({
         name: formData.name,
         dni: formData.dni,
         membershipType: formData.membershipType,
         active: formData.active
       });
-      
-      setClients(prev => [...prev, newClient]);
-      toast.success("Cliente agregado correctamente");
     }
-    
-    setIsDialogOpen(false);
   };
 
   const toggleClientStatus = (id: number) => {
-    ClientManager.toggleClientStatus(id);
-    setClients(prev => prev.map(c => {
-      if (c.id === id) {
-        return { ...c, active: !c.active };
-      }
-      return c;
-    }));
+    toggleStatusMutation.mutate(id);
   };
 
-  const getClientBalance = (clientId: number): number => {
-    return TicketManager.getBalanceByClientId(clientId);
-  };
+  if (clientsError) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500 mb-4">Error al cargar los clientes</p>
+        <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}>
+          Reintentar
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -174,78 +218,92 @@ const ClientsPage: React.FC = () => {
       
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>DNI</TableHead>
-                <TableHead>Membresía</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredClients.length > 0 ? (
-                filteredClients.map(client => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>{client.dni}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        client.membershipType === "Platinum" ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" :
-                        client.membershipType === "VIP" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
-                        client.membershipType === "Gold" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
-                        client.membershipType === "Silver" ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" :
-                        "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+          {isLoadingClients ? (
+            <div className="flex justify-center items-center p-8">
+              <Loader2 className="animate-spin h-8 w-8 text-primary" />
+              <span className="ml-2">Cargando clientes...</span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>DNI</TableHead>
+                  <TableHead>Membresía</TableHead>
+                  <TableHead>Balance</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredClients.length > 0 ? (
+                  filteredClients.map(client => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">{client.name}</TableCell>
+                      <TableCell>{client.dni}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          client.membershipType === "Platinum" ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" :
+                          client.membershipType === "VIP" ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" :
+                          client.membershipType === "Gold" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" :
+                          client.membershipType === "Silver" ? "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" :
+                          "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                        }`}>
+                          {client.membershipType}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`font-medium ${
+                        isLoadingBalances ? "text-muted-foreground" :
+                        (clientBalances[client.id] || 0) > 0 
+                          ? "text-green-600 dark:text-green-400" 
+                          : "text-red-600 dark:text-red-400"
                       }`}>
-                        {client.membershipType}
-                      </span>
-                    </TableCell>
-                    <TableCell className={`font-medium ${
-                      getClientBalance(client.id) > 0 
-                        ? "text-green-600 dark:text-green-400" 
-                        : "text-red-600 dark:text-red-400"
-                    }`}>
-                      ${getClientBalance(client.id).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={client.active}
-                        onCheckedChange={() => toggleClientStatus(client.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openEditDialog(client)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          asChild
-                        >
-                          <Link to={`/clients/${client.id}`}>
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </div>
+                        {isLoadingBalances ? (
+                          <Loader2 className="h-4 w-4 animate-spin inline-block mr-1" />
+                        ) : (
+                          `$${(clientBalances[client.id] || 0).toLocaleString()}`
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={client.active}
+                          onCheckedChange={() => toggleClientStatus(client.id)}
+                          disabled={toggleStatusMutation.isPending}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => openEditDialog(client)}
+                            disabled={updateClientMutation.isPending}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            asChild
+                          >
+                            <Link to={`/clients/${client.id}`}>
+                              <ArrowRight className="h-4 w-4" />
+                            </Link>
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      {searchTerm ? "No se encontraron clientes" : "No hay clientes aún. ¡Agrega tu primer cliente!"}
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6">
-                    {searchTerm ? "No se encontraron clientes" : "No hay clientes aún. ¡Agrega tu primer cliente!"}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
       
@@ -319,7 +377,13 @@ const ClientsPage: React.FC = () => {
             </div>
             
             <DialogFooter>
-              <Button type="submit">
+              <Button 
+                type="submit"
+                disabled={addClientMutation.isPending || updateClientMutation.isPending}
+              >
+                {(addClientMutation.isPending || updateClientMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {editingClient ? "Guardar Cambios" : "Agregar Cliente"}
               </Button>
             </DialogFooter>

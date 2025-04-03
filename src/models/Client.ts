@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 export type MembershipType = "Regular" | "Silver" | "Gold" | "VIP" | "Platinum";
 
 export interface Client {
@@ -10,53 +12,130 @@ export interface Client {
 }
 
 export class ClientManager {
-  private static localStorageKey = "casino-clients";
+  static async getAllClients(): Promise<Client[]> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('name');
 
-  static getAllClients(): Client[] {
-    const clientsJson = localStorage.getItem(this.localStorageKey);
-    return clientsJson ? JSON.parse(clientsJson) : [];
+    if (error) {
+      console.error("Error fetching clients:", error);
+      return [];
+    }
+
+    return data.map(client => ({
+      id: client.id,
+      name: client.name,
+      dni: client.dni,
+      membershipType: client.membership_type as MembershipType,
+      active: client.active
+    }));
   }
 
-  static saveClients(clients: Client[]): void {
-    localStorage.setItem(this.localStorageKey, JSON.stringify(clients));
-  }
+  static async addClient(client: Omit<Client, "id">): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({
+        name: client.name,
+        dni: client.dni,
+        membership_type: client.membershipType,
+        active: client.active
+      })
+      .select()
+      .single();
 
-  static addClient(client: Omit<Client, "id">): Client {
-    const clients = this.getAllClients();
-    const newClient: Client = {
-      ...client,
-      id: clients.length > 0 ? Math.max(...clients.map(c => c.id)) + 1 : 1
+    if (error) {
+      console.error("Error adding client:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      dni: data.dni,
+      membershipType: data.membership_type as MembershipType,
+      active: data.active
     };
-    clients.push(newClient);
-    this.saveClients(clients);
-    return newClient;
   }
 
-  static updateClient(client: Client): void {
-    const clients = this.getAllClients();
-    const index = clients.findIndex(c => c.id === client.id);
-    if (index !== -1) {
-      clients[index] = client;
-      this.saveClients(clients);
+  static async updateClient(client: Client): Promise<void> {
+    const { error } = await supabase
+      .from('clients')
+      .update({
+        name: client.name,
+        dni: client.dni,
+        membership_type: client.membershipType,
+        active: client.active
+      })
+      .eq('id', client.id);
+
+    if (error) {
+      console.error("Error updating client:", error);
     }
   }
 
-  static toggleClientStatus(id: number): void {
-    const clients = this.getAllClients();
-    const index = clients.findIndex(c => c.id === id);
-    if (index !== -1) {
-      clients[index].active = !clients[index].active;
-      this.saveClients(clients);
+  static async toggleClientStatus(id: number): Promise<void> {
+    // First get the current status
+    const { data, error: fetchError } = await supabase
+      .from('clients')
+      .select('active')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching client status:", fetchError);
+      return;
+    }
+
+    // Then toggle it
+    const { error: updateError } = await supabase
+      .from('clients')
+      .update({ active: !data.active })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error("Error toggling client status:", updateError);
     }
   }
 
-  static getClientById(id: number): Client | undefined {
-    const clients = this.getAllClients();
-    return clients.find(c => c.id === id);
+  static async getClientById(id: number): Promise<Client | null> {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error("Error fetching client:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      dni: data.dni,
+      membershipType: data.membership_type as MembershipType,
+      active: data.active
+    };
   }
 
-  static isUniqueDni(dni: string, excludeId?: number): boolean {
-    const clients = this.getAllClients();
-    return !clients.some(c => c.dni === dni && c.id !== excludeId);
+  static async isUniqueDni(dni: string, excludeId?: number): Promise<boolean> {
+    let query = supabase
+      .from('clients')
+      .select('id')
+      .eq('dni', dni);
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error checking DNI uniqueness:", error);
+      return false;
+    }
+
+    return data.length === 0;
   }
 }

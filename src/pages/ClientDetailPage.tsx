@@ -1,46 +1,74 @@
 
-import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useState } from "react";
+import { useParams, Link, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClientManager, Client } from "@/models/Client";
-import { TicketManager, Ticket, TicketType } from "@/models/Ticket";
-import { ArrowLeft, Plus, CalendarIcon } from "lucide-react";
+import { ClientManager } from "@/models/Client";
+import { TicketManager, TicketType } from "@/models/Ticket";
+import { ArrowLeft, Plus, CalendarIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 const ClientDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0");
+  const queryClient = useQueryClient();
   
-  const [client, setClient] = useState<Client | null>(null);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [balance, setBalance] = useState(0);
   
   const [formData, setFormData] = useState({
     type: "Deposit" as TicketType,
     amount: "",
   });
 
-  useEffect(() => {
-    // Load client
-    const clientData = ClientManager.getClientById(clientId);
-    if (clientData) {
-      setClient(clientData);
-      
-      // Load client's tickets
-      const clientTickets = TicketManager.getTicketsByClientId(clientId);
-      setTickets(clientTickets);
-      
-      // Calculate balance
-      const clientBalance = TicketManager.getBalanceByClientId(clientId);
-      setBalance(clientBalance);
+  // Fetch client data
+  const { 
+    data: client, 
+    isLoading: isLoadingClient,
+    error: clientError 
+  } = useQuery({
+    queryKey: ['client', clientId],
+    queryFn: () => ClientManager.getClientById(clientId)
+  });
+
+  // Fetch client's tickets
+  const { 
+    data: tickets = [], 
+    isLoading: isLoadingTickets,
+  } = useQuery({
+    queryKey: ['tickets', clientId],
+    queryFn: () => TicketManager.getTicketsByClientId(clientId),
+    enabled: !!client
+  });
+
+  // Calculate client's balance
+  const { 
+    data: balance = 0, 
+    isLoading: isLoadingBalance 
+  } = useQuery({
+    queryKey: ['balance', clientId],
+    queryFn: () => TicketManager.getBalanceByClientId(clientId),
+    enabled: !!client
+  });
+
+  // Add ticket mutation
+  const addTicketMutation = useMutation({
+    mutationFn: TicketManager.addTicket,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['balance', clientId] });
+      queryClient.invalidateQueries({ queryKey: ['clientBalances'] });
+      toast.success(`${formData.type === "Deposit" ? "Depósito" : "Retiro"} registrado correctamente`);
+      setIsDialogOpen(false);
+    },
+    onError: () => {
+      toast.error(`Error al registrar ${formData.type === "Deposit" ? "depósito" : "retiro"}`);
     }
-  }, [clientId]);
+  });
 
   const openDialog = (type: TicketType) => {
     setFormData({
@@ -77,27 +105,26 @@ const ClientDetailPage: React.FC = () => {
     }
     
     // Add new ticket
-    const newTicket = TicketManager.addTicket({
+    addTicketMutation.mutate({
       clientId,
       type: formData.type,
       amount,
       date: new Date().toISOString(),
     });
-    
-    // Update state
-    setTickets(prev => [...prev, newTicket]);
-    
-    // Update balance
-    const newBalance = formData.type === "Deposit" 
-      ? balance + amount 
-      : balance - amount;
-    setBalance(newBalance);
-    
-    toast.success(`${formData.type === "Deposit" ? "Depósito" : "Retiro"} registrado correctamente`);
-    setIsDialogOpen(false);
   };
 
-  if (!client) {
+  // Show loading state
+  if (isLoadingClient) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p>Cargando información del cliente...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (clientError || !client) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh]">
         <h1 className="text-2xl font-bold mb-4">Cliente no encontrado</h1>
@@ -172,28 +199,39 @@ const ClientDetailPage: React.FC = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-muted-foreground">Balance Actual</p>
-                <p className={`text-2xl font-bold ${
-                  balance > 0 
-                    ? "text-green-600 dark:text-green-400" 
-                    : balance < 0 
-                      ? "text-red-600 dark:text-red-400" 
-                      : ""
-                }`}>
-                  ${balance.toLocaleString()}
-                </p>
+                {isLoadingBalance ? (
+                  <div className="flex justify-end items-center">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <span>Calculando...</span>
+                  </div>
+                ) : (
+                  <p className={`text-2xl font-bold ${
+                    balance > 0 
+                      ? "text-green-600 dark:text-green-400" 
+                      : balance < 0 
+                        ? "text-red-600 dark:text-red-400" 
+                        : ""
+                  }`}>
+                    ${balance.toLocaleString()}
+                  </p>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex gap-2">
-              <Button onClick={() => openDialog("Deposit")} className="flex-1">
+              <Button 
+                onClick={() => openDialog("Deposit")} 
+                className="flex-1"
+                disabled={addTicketMutation.isPending}
+              >
                 <Plus className="mr-2 h-4 w-4" /> Nuevo Depósito
               </Button>
               <Button 
                 onClick={() => openDialog("Withdrawal")} 
                 variant="outline" 
                 className="flex-1"
-                disabled={balance <= 0}
+                disabled={balance <= 0 || addTicketMutation.isPending}
               >
                 <Plus className="mr-2 h-4 w-4" /> Nuevo Retiro
               </Button>
@@ -201,7 +239,12 @@ const ClientDetailPage: React.FC = () => {
             
             <div>
               <h3 className="font-medium mb-2">Historial de Transacciones</h3>
-              {tickets.length > 0 ? (
+              {isLoadingTickets ? (
+                <div className="flex justify-center items-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                  <p>Cargando transacciones...</p>
+                </div>
+              ) : tickets.length > 0 ? (
                 <div className="border rounded-md max-h-96 overflow-y-auto">
                   <Table>
                     <TableHeader>
@@ -212,9 +255,7 @@ const ClientDetailPage: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {[...tickets]
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                        .map(ticket => (
+                      {tickets.map(ticket => (
                         <TableRow key={ticket.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
@@ -290,7 +331,13 @@ const ClientDetailPage: React.FC = () => {
             </div>
             
             <DialogFooter>
-              <Button type="submit">
+              <Button 
+                type="submit"
+                disabled={addTicketMutation.isPending}
+              >
+                {addTicketMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Registrar {formData.type === "Deposit" ? "Depósito" : "Retiro"}
               </Button>
             </DialogFooter>

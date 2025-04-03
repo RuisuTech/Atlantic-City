@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 export type TicketType = "Deposit" | "Withdrawal";
 
 export interface Ticket {
@@ -10,35 +12,75 @@ export interface Ticket {
 }
 
 export class TicketManager {
-  private static localStorageKey = "casino-tickets";
+  static async getAllTickets(): Promise<Ticket[]> {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .order('date', { ascending: false });
 
-  static getAllTickets(): Ticket[] {
-    const ticketsJson = localStorage.getItem(this.localStorageKey);
-    return ticketsJson ? JSON.parse(ticketsJson) : [];
+    if (error) {
+      console.error("Error fetching tickets:", error);
+      return [];
+    }
+
+    return data.map(ticket => ({
+      id: ticket.id,
+      clientId: ticket.client_id,
+      type: ticket.type as TicketType,
+      amount: Number(ticket.amount),
+      date: ticket.date
+    }));
   }
 
-  static saveTickets(tickets: Ticket[]): void {
-    localStorage.setItem(this.localStorageKey, JSON.stringify(tickets));
-  }
+  static async addTicket(ticket: Omit<Ticket, "id">): Promise<Ticket | null> {
+    const { data, error } = await supabase
+      .from('tickets')
+      .insert({
+        client_id: ticket.clientId,
+        type: ticket.type,
+        amount: ticket.amount,
+        date: ticket.date
+      })
+      .select()
+      .single();
 
-  static addTicket(ticket: Omit<Ticket, "id">): Ticket {
-    const tickets = this.getAllTickets();
-    const newTicket: Ticket = {
-      ...ticket,
-      id: tickets.length > 0 ? Math.max(...tickets.map(t => t.id)) + 1 : 1
+    if (error) {
+      console.error("Error adding ticket:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      clientId: data.client_id,
+      type: data.type as TicketType,
+      amount: Number(data.amount),
+      date: data.date
     };
-    tickets.push(newTicket);
-    this.saveTickets(tickets);
-    return newTicket;
   }
 
-  static getTicketsByClientId(clientId: number): Ticket[] {
-    const tickets = this.getAllTickets();
-    return tickets.filter(t => t.clientId === clientId);
+  static async getTicketsByClientId(clientId: number): Promise<Ticket[]> {
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching client tickets:", error);
+      return [];
+    }
+
+    return data.map(ticket => ({
+      id: ticket.id,
+      clientId: ticket.client_id,
+      type: ticket.type as TicketType,
+      amount: Number(ticket.amount),
+      date: ticket.date
+    }));
   }
 
-  static getBalanceByClientId(clientId: number): number {
-    const tickets = this.getTicketsByClientId(clientId);
+  static async getBalanceByClientId(clientId: number): Promise<number> {
+    const tickets = await this.getTicketsByClientId(clientId);
     return tickets.reduce((balance, ticket) => {
       return balance + (ticket.type === "Deposit" ? ticket.amount : -ticket.amount);
     }, 0);

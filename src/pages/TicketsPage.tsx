@@ -7,63 +7,76 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TicketManager, Ticket } from "@/models/Ticket";
 import { ClientManager } from "@/models/Client";
-import { Search, CalendarIcon, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, CalendarIcon, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 const TicketsPage: React.FC = () => {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "deposit" | "withdrawal">("all");
   const [sortDirection, setSortDirection] = useState<"desc" | "asc">("desc");
 
-  // Load tickets from local storage
-  useEffect(() => {
-    const loadedTickets = TicketManager.getAllTickets();
-    setTickets(loadedTickets);
-    setFilteredTickets(sortTickets(loadedTickets, sortDirection));
-  }, []);
+  // Fetch all tickets
+  const { 
+    data: tickets = [], 
+    isLoading: isLoadingTickets,
+    error: ticketsError
+  } = useQuery({
+    queryKey: ['tickets'],
+    queryFn: TicketManager.getAllTickets
+  });
 
-  // Filter and sort tickets based on search term, filter type, and sort direction
-  useEffect(() => {
-    let filtered = [...tickets];
-    
+  // Fetch all clients for name lookups
+  const { 
+    data: clientsMap = {}, 
+    isLoading: isLoadingClients 
+  } = useQuery({
+    queryKey: ['clientsMap'],
+    queryFn: async () => {
+      const clients = await ClientManager.getAllClients();
+      return clients.reduce((map: Record<number, string>, client) => {
+        map[client.id] = client.name;
+        return map;
+      }, {});
+    }
+  });
+
+  // Filter and sort tickets
+  const filteredTickets = tickets.filter(ticket => {
     // Apply type filter
     if (filterType !== "all") {
       const ticketType = filterType === "deposit" ? "Deposit" : "Withdrawal";
-      filtered = filtered.filter(ticket => ticket.type === ticketType);
+      if (ticket.type !== ticketType) return false;
     }
     
-    // Apply search filter (search by client name)
+    // Apply search filter (by client name)
     if (searchTerm.trim()) {
-      const lowerSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter(ticket => {
-        const client = ClientManager.getClientById(ticket.clientId);
-        return client && client.name.toLowerCase().includes(lowerSearch);
-      });
+      const clientName = clientsMap[ticket.clientId] || "";
+      return clientName.toLowerCase().includes(searchTerm.toLowerCase());
     }
     
-    // Apply sort
-    setFilteredTickets(sortTickets(filtered, sortDirection));
-  }, [searchTerm, filterType, tickets, sortDirection]);
-
-  const sortTickets = (tickets: Ticket[], direction: "asc" | "desc"): Ticket[] => {
-    return [...tickets].sort((a, b) => {
-      const dateA = new Date(a.date).getTime();
-      const dateB = new Date(b.date).getTime();
-      return direction === "desc" ? dateB - dateA : dateA - dateB;
-    });
-  };
+    return true;
+  }).sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return sortDirection === "desc" ? dateB - dateA : dateA - dateB;
+  });
 
   const toggleSortDirection = () => {
-    const newDirection = sortDirection === "desc" ? "asc" : "desc";
-    setSortDirection(newDirection);
+    setSortDirection(prev => prev === "desc" ? "asc" : "desc");
   };
 
   const getClientName = (clientId: number): string => {
-    const client = ClientManager.getClientById(clientId);
-    return client ? client.name : "Cliente Desconocido";
+    return clientsMap[clientId] || "Cliente Desconocido";
   };
+
+  if (ticketsError) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-red-500 mb-4">Error al cargar las boletas</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -105,68 +118,75 @@ const TicketsPage: React.FC = () => {
       
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTickets.length > 0 ? (
-                filteredTickets.map(ticket => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                        {new Date(ticket.date).toLocaleDateString('es-ES')}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(ticket.date).toLocaleTimeString('es-ES')}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {getClientName(ticket.clientId)}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          {isLoadingTickets || isLoadingClients ? (
+            <div className="flex justify-center items-center p-8">
+              <Loader2 className="animate-spin h-8 w-8 text-primary mr-2" />
+              <span>Cargando boletas...</span>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTickets.length > 0 ? (
+                  filteredTickets.map(ticket => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                          {new Date(ticket.date).toLocaleDateString('es-ES')}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(ticket.date).toLocaleTimeString('es-ES')}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {getClientName(ticket.clientId)}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          ticket.type === "Deposit" 
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                        }`}>
+                          {ticket.type === "Deposit" ? "Depósito" : "Retiro"}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${
                         ticket.type === "Deposit" 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                          ? "text-green-600 dark:text-green-400" 
+                          : "text-red-600 dark:text-red-400"
                       }`}>
-                        {ticket.type === "Deposit" ? "Depósito" : "Retiro"}
-                      </span>
-                    </TableCell>
-                    <TableCell className={`text-right font-medium ${
-                      ticket.type === "Deposit" 
-                        ? "text-green-600 dark:text-green-400" 
-                        : "text-red-600 dark:text-red-400"
-                    }`}>
-                      {ticket.type === "Deposit" ? "+" : "-"}${ticket.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/clients/${ticket.clientId}`}>
-                          Ver Cliente
-                        </Link>
-                      </Button>
+                        {ticket.type === "Deposit" ? "+" : "-"}${ticket.amount.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link to={`/clients/${ticket.clientId}`}>
+                            Ver Cliente
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6">
+                      {tickets.length === 0 
+                        ? "No hay boletas registradas aún" 
+                        : "No hay boletas que coincidan con tu búsqueda"}
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-6">
-                    {tickets.length === 0 
-                      ? "No hay boletas registradas aún" 
-                      : "No hay boletas que coincidan con tu búsqueda"}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
