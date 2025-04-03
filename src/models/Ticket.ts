@@ -23,7 +23,7 @@ export class TicketManager {
       return [];
     }
 
-    return data.map(ticket => ({
+    return (data || []).map(ticket => ({
       id: ticket.id,
       clientId: ticket.client_id,
       type: ticket.type as TicketType,
@@ -49,6 +49,8 @@ export class TicketManager {
       return null;
     }
 
+    if (!data) return null;
+
     return {
       id: data.id,
       clientId: data.client_id,
@@ -70,7 +72,7 @@ export class TicketManager {
       return [];
     }
 
-    return data.map(ticket => ({
+    return (data || []).map(ticket => ({
       id: ticket.id,
       clientId: ticket.client_id,
       type: ticket.type as TicketType,

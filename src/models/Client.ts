@@ -23,7 +23,7 @@ export class ClientManager {
       return [];
     }
 
-    return data.map(client => ({
+    return (data || []).map(client => ({
       id: client.id,
       name: client.name,
       dni: client.dni,
@@ -48,6 +48,8 @@ export class ClientManager {
       console.error("Error adding client:", error);
       return null;
     }
+
+    if (!data) return null;
 
     return {
       id: data.id,
@@ -90,7 +92,7 @@ export class ClientManager {
     // Then toggle it
     const { error: updateError } = await supabase
       .from('clients')
-      .update({ active: !data.active })
+      .update({ active: !data?.active })
       .eq('id', id);
 
     if (updateError) {
@@ -109,6 +111,8 @@ export class ClientManager {
       console.error("Error fetching client:", error);
       return null;
     }
+
+    if (!data) return null;
 
     return {
       id: data.id,
@@ -136,6 +140,6 @@ export class ClientManager {
       return false;
     }
 
-    return data.length === 0;
+    return (data || []).length === 0;
   }
 }
