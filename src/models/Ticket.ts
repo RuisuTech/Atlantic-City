@@ -32,7 +32,7 @@ export class TicketManager {
       type: ticket.type as TicketType,
       amount: Number(ticket.amount),
       date: ticket.date,
-      code: ticket.code,
+      code: ticket.code || '',
       paymentMethod: ticket.payment_method as PaymentMethod
     }));
   }
@@ -70,7 +70,7 @@ export class TicketManager {
       type: data.type as TicketType,
       amount: Number(data.amount),
       date: data.date,
-      code: data.code,
+      code: data.code || '',
       paymentMethod: data.payment_method as PaymentMethod
     };
   }
@@ -93,7 +93,7 @@ export class TicketManager {
       type: ticket.type as TicketType,
       amount: Number(ticket.amount),
       date: ticket.date,
-      code: ticket.code,
+      code: ticket.code || '',
       paymentMethod: ticket.payment_method as PaymentMethod
     }));
   }

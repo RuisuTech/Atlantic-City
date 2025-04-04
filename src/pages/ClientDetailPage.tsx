@@ -110,6 +110,7 @@ const ClientDetailPage: React.FC = () => {
       type: formData.type,
       amount,
       date: new Date().toISOString(),
+      paymentMethod: "cash" // Default to cash payment method
     });
   };
 
