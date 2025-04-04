@@ -1,20 +1,23 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TicketManager, Ticket } from "@/models/Ticket";
+import { TicketManager, Ticket, TicketType } from "@/models/Ticket";
 import { ClientManager } from "@/models/Client";
-import { Search, CalendarIcon, ArrowUp, ArrowDown, Loader2 } from "lucide-react";
+import { Search, CalendarIcon, ArrowUp, ArrowDown, Loader2, PlusCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { CreateTicketDialog } from "@/components/tickets/CreateTicketDialog";
 
 const TicketsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<"all" | "deposit" | "withdrawal">("all");
   const [sortDirection, setSortDirection] = useState<"desc" | "asc">("desc");
+  const [createTicketOpen, setCreateTicketOpen] = useState(false);
+  const [ticketType, setTicketType] = useState<TicketType>("Deposit");
 
   // Fetch all tickets
   const { 
@@ -70,6 +73,16 @@ const TicketsPage: React.FC = () => {
     return clientsMap[clientId] || "Cliente Desconocido";
   };
 
+  const handleCreateDeposit = () => {
+    setTicketType("Deposit");
+    setCreateTicketOpen(true);
+  };
+
+  const handleCreateWithdrawal = () => {
+    setTicketType("Withdrawal");
+    setCreateTicketOpen(true);
+  };
+
   if (ticketsError) {
     return (
       <div className="p-6 text-center">
@@ -82,38 +95,55 @@ const TicketsPage: React.FC = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Gestión de Boletas</h1>
       
-      <div className="flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por cliente..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
+        <div className="flex flex-col md:flex-row md:items-center space-y-3 md:space-y-0 md:space-x-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por cliente..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <Select
+            value={filterType}
+            onValueChange={(value) => setFilterType(value as any)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrar por tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los Tipos</SelectItem>
+              <SelectItem value="deposit">Depósitos</SelectItem>
+              <SelectItem value="withdrawal">Retiros</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button 
+            variant="outline" 
+            onClick={toggleSortDirection}
+            className="flex items-center gap-2"
+          >
+            Fecha {sortDirection === "desc" ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+          </Button>
         </div>
         
-        <Select
-          value={filterType}
-          onValueChange={(value) => setFilterType(value as any)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filtrar por tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los Tipos</SelectItem>
-            <SelectItem value="deposit">Depósitos</SelectItem>
-            <SelectItem value="withdrawal">Retiros</SelectItem>
-          </SelectContent>
-        </Select>
-        
-        <Button 
-          variant="outline" 
-          onClick={toggleSortDirection}
-          className="flex items-center gap-2"
-        >
-          Fecha {sortDirection === "desc" ? <ArrowDown className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleCreateDeposit} 
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <ArrowDown className="mr-1 h-4 w-4" /> Depósito
+          </Button>
+          <Button 
+            onClick={handleCreateWithdrawal}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            <ArrowUp className="mr-1 h-4 w-4" /> Retiro
+          </Button>
+        </div>
       </div>
       
       <Card>
@@ -189,6 +219,12 @@ const TicketsPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      <CreateTicketDialog 
+        open={createTicketOpen} 
+        onOpenChange={setCreateTicketOpen}
+        defaultType={ticketType}
+      />
     </div>
   );
 };
