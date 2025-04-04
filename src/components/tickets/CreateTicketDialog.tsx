@@ -4,22 +4,24 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, CreditCard, Banknote, Building } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 
 import { Client, ClientManager } from "@/models/Client";
-import { TicketManager, TicketType } from "@/models/Ticket";
+import { TicketManager, TicketType, PaymentMethod } from "@/models/Ticket";
 
 const ticketSchema = z.object({
   clientId: z.number().int().positive("Debes seleccionar un cliente"),
   amount: z.number().positive("El monto debe ser mayor a cero"),
   type: z.enum(["Deposit", "Withdrawal"]),
+  paymentMethod: z.enum(["cash", "card", "bank_transfer"])
 });
 
 type TicketFormValues = z.infer<typeof ticketSchema>;
@@ -42,6 +44,7 @@ export function CreateTicketDialog({ open, onOpenChange, defaultType = "Deposit"
       clientId: undefined,
       amount: undefined,
       type: defaultType,
+      paymentMethod: "cash"
     },
   });
 
@@ -57,7 +60,7 @@ export function CreateTicketDialog({ open, onOpenChange, defaultType = "Deposit"
     if (open) {
       loadClients();
       // Reset the form when opening the dialog with the default type
-      form.reset({ clientId: undefined, amount: undefined, type: defaultType });
+      form.reset({ clientId: undefined, amount: undefined, type: defaultType, paymentMethod: "cash" });
     }
   }, [open, form, defaultType]);
 
@@ -69,6 +72,7 @@ export function CreateTicketDialog({ open, onOpenChange, defaultType = "Deposit"
         type: values.type,
         amount: values.amount,
         date: new Date().toISOString(),
+        paymentMethod: values.paymentMethod
       });
 
       if (result) {
@@ -102,6 +106,24 @@ export function CreateTicketDialog({ open, onOpenChange, defaultType = "Deposit"
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const getPaymentMethodLabel = (method: PaymentMethod) => {
+    switch (method) {
+      case "cash": return "Efectivo";
+      case "card": return "Tarjeta";
+      case "bank_transfer": return "Transferencia";
+      default: return "Desconocido";
+    }
+  };
+
+  const getPaymentMethodIcon = (method: PaymentMethod) => {
+    switch (method) {
+      case "cash": return <Banknote className="h-4 w-4" />;
+      case "card": return <CreditCard className="h-4 w-4" />;
+      case "bank_transfer": return <Building className="h-4 w-4" />;
+      default: return null;
     }
   };
 
@@ -201,6 +223,34 @@ export function CreateTicketDialog({ open, onOpenChange, defaultType = "Deposit"
                         disabled={isLoading}
                       />
                     </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="paymentMethod"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Método de pago</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      {(["cash", "card", "bank_transfer"] as PaymentMethod[]).map((method) => (
+                        <div key={method} className="flex items-center space-x-2 rounded-md border p-2">
+                          <RadioGroupItem value={method} id={method} />
+                          <label htmlFor={method} className="flex items-center gap-2 font-normal cursor-pointer flex-1">
+                            {getPaymentMethodIcon(method)}
+                            {getPaymentMethodLabel(method)}
+                          </label>
+                        </div>
+                      ))}
+                    </RadioGroup>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

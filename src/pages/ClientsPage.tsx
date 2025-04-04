@@ -149,27 +149,24 @@ const ClientsPage: React.FC = () => {
       return;
     }
     
-    // Check for unique DNI
-    const isDniUnique = await ClientManager.isUniqueDni(
-      formData.dni, 
-      editingClient?.id
-    );
-    
-    if (!isDniUnique) {
-      toast.error("El DNI debe ser único");
-      return;
-    }
-    
     if (editingClient) {
-      // Update existing client
+      // Update existing client - DNI is not changed, it's kept from the existing client
       updateClientMutation.mutate({
         ...editingClient,
         name: formData.name,
-        dni: formData.dni,
+        // dni stays the same, we don't allow changes to DNI when editing
         membershipType: formData.membershipType,
         active: formData.active
       });
     } else {
+      // For new clients, check DNI uniqueness
+      const isDniUnique = await ClientManager.isUniqueDni(formData.dni);
+      
+      if (!isDniUnique) {
+        toast.error("El DNI debe ser único");
+        return;
+      }
+      
       // Add new client
       addClientMutation.mutate({
         name: formData.name,
@@ -344,7 +341,14 @@ const ClientsPage: React.FC = () => {
                   value={formData.dni}
                   onChange={handleInputChange}
                   required
+                  disabled={!!editingClient} // DNI field is disabled when editing
+                  className={editingClient ? "bg-gray-100 cursor-not-allowed" : ""}
                 />
+                {editingClient && (
+                  <p className="text-xs text-muted-foreground">
+                    El DNI no puede ser modificado una vez creado el cliente.
+                  </p>
+                )}
               </div>
               
               <div className="space-y-2">

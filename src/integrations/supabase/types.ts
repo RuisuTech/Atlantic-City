@@ -40,25 +40,31 @@ export type Database = {
         Row: {
           amount: number
           client_id: number
+          code: string
           created_at: string
           date: string
           id: number
+          payment_method: string
           type: string
         }
         Insert: {
           amount: number
           client_id: number
+          code?: string
           created_at?: string
           date?: string
           id?: number
+          payment_method?: string
           type: string
         }
         Update: {
           amount?: number
           client_id?: number
+          code?: string
           created_at?: string
           date?: string
           id?: number
+          payment_method?: string
           type?: string
         }
         Relationships: [

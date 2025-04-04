@@ -7,10 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TicketManager, Ticket, TicketType } from "@/models/Ticket";
 import { ClientManager } from "@/models/Client";
-import { Search, CalendarIcon, ArrowUp, ArrowDown, Loader2, PlusCircle } from "lucide-react";
+import { 
+  Search, CalendarIcon, ArrowUp, ArrowDown, Loader2, 
+  CreditCard, Banknote, Building, Download 
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { CreateTicketDialog } from "@/components/tickets/CreateTicketDialog";
+import { useToast } from "@/hooks/use-toast";
 
 const TicketsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,6 +22,7 @@ const TicketsPage: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<"desc" | "asc">("desc");
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [ticketType, setTicketType] = useState<TicketType>("Deposit");
+  const { toast } = useToast();
 
   // Fetch all tickets
   const { 
@@ -52,10 +57,12 @@ const TicketsPage: React.FC = () => {
       if (ticket.type !== ticketType) return false;
     }
     
-    // Apply search filter (by client name)
+    // Apply search filter (by client name or ticket code)
     if (searchTerm.trim()) {
       const clientName = clientsMap[ticket.clientId] || "";
-      return clientName.toLowerCase().includes(searchTerm.toLowerCase());
+      const ticketCode = ticket.code || "";
+      return clientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             ticketCode.toLowerCase().includes(searchTerm.toLowerCase());
     }
     
     return true;
@@ -73,6 +80,24 @@ const TicketsPage: React.FC = () => {
     return clientsMap[clientId] || "Cliente Desconocido";
   };
 
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case "cash": return <Banknote className="h-4 w-4 text-green-600" />;
+      case "card": return <CreditCard className="h-4 w-4 text-blue-600" />;
+      case "bank_transfer": return <Building className="h-4 w-4 text-purple-600" />;
+      default: return <Banknote className="h-4 w-4 text-gray-600" />;
+    }
+  };
+
+  const getPaymentMethodLabel = (method: string) => {
+    switch (method) {
+      case "cash": return "Efectivo";
+      case "card": return "Tarjeta";
+      case "bank_transfer": return "Transferencia";
+      default: return "Desconocido";
+    }
+  };
+
   const handleCreateDeposit = () => {
     setTicketType("Deposit");
     setCreateTicketOpen(true);
@@ -81,6 +106,45 @@ const TicketsPage: React.FC = () => {
   const handleCreateWithdrawal = () => {
     setTicketType("Withdrawal");
     setCreateTicketOpen(true);
+  };
+
+  const handleExportTickets = async () => {
+    try {
+      const csvContent = await TicketManager.exportTicketsToCSV();
+      if (csvContent === "No tickets to export") {
+        toast({
+          title: "Sin datos",
+          description: "No hay boletas para exportar",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `boletas_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = "hidden";
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Exportación exitosa",
+        description: "Las boletas se han exportado correctamente"
+      });
+    } catch (error) {
+      console.error("Error exporting tickets:", error);
+      toast({
+        title: "Error",
+        description: "Ocurrió un error al exportar las boletas",
+        variant: "destructive"
+      });
+    }
   };
 
   if (ticketsError) {
@@ -100,7 +164,7 @@ const TicketsPage: React.FC = () => {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por cliente..."
+              placeholder="Buscar por cliente o código..."
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -132,6 +196,13 @@ const TicketsPage: React.FC = () => {
         
         <div className="flex gap-2">
           <Button 
+            onClick={handleExportTickets} 
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" /> Exportar
+          </Button>
+          <Button 
             onClick={handleCreateDeposit} 
             className="bg-green-600 hover:bg-green-700"
           >
@@ -157,9 +228,11 @@ const TicketsPage: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Código</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Método de Pago</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -168,6 +241,9 @@ const TicketsPage: React.FC = () => {
                 {filteredTickets.length > 0 ? (
                   filteredTickets.map(ticket => (
                     <TableRow key={ticket.id}>
+                      <TableCell className="font-medium">
+                        {ticket.code}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
@@ -189,6 +265,12 @@ const TicketsPage: React.FC = () => {
                           {ticket.type === "Deposit" ? "Depósito" : "Retiro"}
                         </span>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getPaymentMethodIcon(ticket.paymentMethod)}
+                          <span>{getPaymentMethodLabel(ticket.paymentMethod)}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className={`text-right font-medium ${
                         ticket.type === "Deposit" 
                           ? "text-green-600 dark:text-green-400" 
@@ -207,7 +289,7 @@ const TicketsPage: React.FC = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6">
+                    <TableCell colSpan={7} className="text-center py-6">
                       {tickets.length === 0 
                         ? "No hay boletas registradas aún" 
                         : "No hay boletas que coincidan con tu búsqueda"}
