@@ -11,6 +11,8 @@ import { ShieldCheck, User, KeyRound, Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { hashPassword } from "@/utils/password";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -22,7 +24,8 @@ const LoginPage: React.FC = () => {
   const [registerForm, setRegisterForm] = useState({
     username: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    role: "cashier" // Default role
   });
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -44,6 +47,10 @@ const LoginPage: React.FC = () => {
   const handleRegisterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setRegisterForm(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleRoleChange = (value: string) => {
+    setRegisterForm(prev => ({ ...prev, role: value }));
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -89,7 +96,7 @@ const LoginPage: React.FC = () => {
         .insert({
           username: registerForm.username,
           password_hash,
-          role: 'cashier', // Por defecto, los nuevos usuarios son cajeros
+          role: registerForm.role, // Usar el rol seleccionado
           active: true
         });
         
@@ -105,7 +112,8 @@ const LoginPage: React.FC = () => {
       setRegisterForm({
         username: "",
         password: "",
-        confirmPassword: ""
+        confirmPassword: "",
+        role: "cashier"
       });
       
       // Establecer los valores para el login
@@ -237,6 +245,21 @@ const LoginPage: React.FC = () => {
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-role">Rol de Usuario</Label>
+                  <Select 
+                    value={registerForm.role} 
+                    onValueChange={handleRoleChange}
+                  >
+                    <SelectTrigger id="reg-role">
+                      <SelectValue placeholder="Seleccione un rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="cashier">Cajero</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardContent>
               <CardFooter>
                 <Button
@@ -267,9 +290,6 @@ const LoginPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground mt-1">
                       Acceso completo: gestión de usuarios, clientes, boletas, configuración.
                     </p>
-                    <div className="mt-2 text-sm font-medium">
-                      Usuario: <span className="text-primary">admin</span>, Contraseña: <span className="text-primary">admin123</span>
-                    </div>
                   </div>
                 </div>
                 
@@ -280,9 +300,6 @@ const LoginPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground mt-1">
                       Acceso limitado: ver clientes activos, crear boletas de depósito/retiro.
                     </p>
-                    <div className="mt-2 text-sm font-medium">
-                      Usuario: <span className="text-primary">cashier</span>, Contraseña: <span className="text-primary">cashier123</span>
-                    </div>
                   </div>
                 </div>
               </div>
