@@ -12,6 +12,9 @@ export interface Ticket {
   date: string; // ISO date string
   code: string;
   paymentMethod: PaymentMethod;
+  createdBy?: string; // UUID of the user who created the ticket
+  updatedBy?: string; // UUID of the user who last updated the ticket
+  updatedAt?: string; // ISO date string of the last update
 }
 
 export class TicketManager {
@@ -33,11 +36,14 @@ export class TicketManager {
       amount: Number(ticket.amount),
       date: ticket.date,
       code: ticket.code || '',
-      paymentMethod: ticket.payment_method as PaymentMethod
+      paymentMethod: ticket.payment_method as PaymentMethod,
+      createdBy: ticket.created_by || undefined,
+      updatedBy: ticket.updated_by || undefined,
+      updatedAt: ticket.updated_at || undefined
     }));
   }
 
-  static async addTicket(ticket: Omit<Ticket, "id" | "code">): Promise<Ticket | null> {
+  static async addTicket(ticket: Omit<Ticket, "id" | "code">, userId?: string): Promise<Ticket | null> {
     // Generate a unique code (this is a backup, the database will also generate one if empty)
     const timestamp = new Date().getTime();
     const randomPart = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -52,7 +58,8 @@ export class TicketManager {
         amount: ticket.amount,
         date: ticket.date,
         payment_method: ticket.paymentMethod,
-        code: uniqueCode
+        code: uniqueCode,
+        created_by: userId
       })
       .select()
       .single();
@@ -71,7 +78,10 @@ export class TicketManager {
       amount: Number(data.amount),
       date: data.date,
       code: data.code || '',
-      paymentMethod: data.payment_method as PaymentMethod
+      paymentMethod: data.payment_method as PaymentMethod,
+      createdBy: data.created_by || undefined,
+      updatedBy: data.updated_by || undefined,
+      updatedAt: data.updated_at || undefined
     };
   }
 
@@ -94,7 +104,10 @@ export class TicketManager {
       amount: Number(ticket.amount),
       date: ticket.date,
       code: ticket.code || '',
-      paymentMethod: ticket.payment_method as PaymentMethod
+      paymentMethod: ticket.payment_method as PaymentMethod,
+      createdBy: ticket.created_by || undefined,
+      updatedBy: ticket.updated_by || undefined,
+      updatedAt: ticket.updated_at || undefined
     }));
   }
 
@@ -105,8 +118,85 @@ export class TicketManager {
     }, 0);
   }
 
-  static async exportTicketsToCSV(): Promise<string> {
-    const tickets = await this.getAllTickets();
+  // Check if a withdrawal is allowed based on client balance
+  static async isWithdrawalAllowed(clientId: number, amount: number): Promise<boolean> {
+    const balance = await this.getBalanceByClientId(clientId);
+    return balance >= amount;
+  }
+
+  // Function to update a ticket
+  static async updateTicket(id: number, ticket: Partial<Omit<Ticket, "id">>, userId?: string): Promise<boolean> {
+    const updateData: any = {};
+    
+    if (ticket.type) updateData.type = ticket.type;
+    if (ticket.amount) updateData.amount = ticket.amount;
+    if (ticket.date) updateData.date = ticket.date;
+    if (ticket.paymentMethod) updateData.payment_method = ticket.paymentMethod;
+    if (userId) updateData.updated_by = userId;
+    
+    const { error } = await supabase
+      .from('tickets')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      console.error("Error updating ticket:", error);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Function to delete a ticket
+  static async deleteTicket(id: number): Promise<boolean> {
+    const { error } = await supabase
+      .from('tickets')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error("Error deleting ticket:", error);
+      return false;
+    }
+
+    return true;
+  }
+
+  // Function to get today's tickets
+  static async getTodayTickets(): Promise<Ticket[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const { data, error } = await supabase
+      .from('tickets')
+      .select('*')
+      .gte('date', today.toISOString())
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching today's tickets:", error);
+      return [];
+    }
+
+    return (data || []).map(ticket => ({
+      id: ticket.id,
+      clientId: ticket.client_id,
+      type: ticket.type as TicketType,
+      amount: Number(ticket.amount),
+      date: ticket.date,
+      code: ticket.code || '',
+      paymentMethod: ticket.payment_method as PaymentMethod,
+      createdBy: ticket.created_by || undefined,
+      updatedBy: ticket.updated_by || undefined,
+      updatedAt: ticket.updated_at || undefined
+    }));
+  }
+
+  static async exportTicketsToCSV(onlyToday: boolean = false): Promise<string> {
+    // Get tickets based on filter
+    const tickets = onlyToday 
+      ? await this.getTodayTickets() 
+      : await this.getAllTickets();
     
     if (tickets.length === 0) {
       return "No tickets to export";
@@ -128,6 +218,22 @@ export class TicketManager {
         console.error("Error fetching client name:", error);
       }
 
+      // Get creator name
+      let creatorName = "Sistema";
+      if (ticket.createdBy) {
+        try {
+          const { data } = await supabase
+            .from('app_users')
+            .select('username')
+            .eq('id', ticket.createdBy)
+            .single();
+          
+          if (data) creatorName = data.username;
+        } catch (error) {
+          console.error("Error fetching creator name:", error);
+        }
+      }
+
       return {
         code: ticket.code,
         date: new Date(ticket.date).toLocaleDateString('es-ES'),
@@ -137,14 +243,15 @@ export class TicketManager {
         type: ticket.type === "Deposit" ? "Depósito" : "Retiro",
         amount: ticket.amount,
         paymentMethod: ticket.paymentMethod === "cash" ? "Efectivo" : 
-                      ticket.paymentMethod === "card" ? "Tarjeta" : "Transferencia"
+                      ticket.paymentMethod === "card" ? "Tarjeta" : "Transferencia",
+        createdBy: creatorName
       };
     }));
 
     // Create CSV header
     const headers = [
       "Código", "Fecha", "Hora", "Cliente", "ID Cliente", 
-      "Tipo", "Monto", "Método de Pago"
+      "Tipo", "Monto", "Método de Pago", "Creado Por"
     ];
     
     // Create CSV content
@@ -159,7 +266,8 @@ export class TicketManager {
         ticket.clientId,
         `"${ticket.type}"`,
         ticket.amount,
-        `"${ticket.paymentMethod}"`
+        `"${ticket.paymentMethod}"`,
+        `"${ticket.createdBy}"`
       ];
       csvContent += row.join(",") + "\n";
     });

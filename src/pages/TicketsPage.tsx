@@ -9,12 +9,14 @@ import { TicketManager, Ticket, TicketType } from "@/models/Ticket";
 import { ClientManager } from "@/models/Client";
 import { 
   Search, CalendarIcon, ArrowUp, ArrowDown, Loader2, 
-  CreditCard, Banknote, Building, Download 
+  CreditCard, Banknote, Building, Download, Trash2, Edit 
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreateTicketDialog } from "@/components/tickets/CreateTicketDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const TicketsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -23,15 +25,20 @@ const TicketsPage: React.FC = () => {
   const [createTicketOpen, setCreateTicketOpen] = useState(false);
   const [ticketType, setTicketType] = useState<TicketType>("Deposit");
   const { toast } = useToast();
+  const { user, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
 
-  // Fetch all tickets
+  // Determine if we should show only today's tickets based on permissions
+  const showOnlyToday = user?.role === 'cashier';
+
+  // Fetch tickets based on role
   const { 
     data: tickets = [], 
     isLoading: isLoadingTickets,
     error: ticketsError
   } = useQuery({
-    queryKey: ['tickets'],
-    queryFn: TicketManager.getAllTickets
+    queryKey: ['tickets', showOnlyToday],
+    queryFn: () => showOnlyToday ? TicketManager.getTodayTickets() : TicketManager.getAllTickets()
   });
 
   // Fetch all clients for name lookups
@@ -46,6 +53,53 @@ const TicketsPage: React.FC = () => {
         map[client.id] = client.name;
         return map;
       }, {});
+    }
+  });
+
+  // Fetch user data for displaying creators
+  const { 
+    data: usersMap = {}, 
+    isLoading: isLoadingUsers 
+  } = useQuery({
+    queryKey: ['usersMap'],
+    queryFn: async () => {
+      // Only fetch users if user is admin
+      if (user?.role !== 'admin') return {};
+      
+      const { data, error } = await supabase
+        .from('app_users')
+        .select('id, username');
+        
+      if (error) {
+        console.error("Error fetching users:", error);
+        return {};
+      }
+      
+      return (data || []).reduce((map: Record<string, string>, user) => {
+        map[user.id] = user.username;
+        return map;
+      }, {});
+    },
+    enabled: user?.role === 'admin'
+  });
+
+  // Delete ticket mutation
+  const deleteTicketMutation = useMutation({
+    mutationFn: TicketManager.deleteTicket,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['clientBalances'] });
+      toast({
+        title: "Boleta eliminada",
+        description: "La boleta ha sido eliminada correctamente"
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la boleta",
+        variant: "destructive"
+      });
     }
   });
 
@@ -80,6 +134,11 @@ const TicketsPage: React.FC = () => {
     return clientsMap[clientId] || "Cliente Desconocido";
   };
 
+  const getUserName = (userId?: string): string => {
+    if (!userId) return "Sistema";
+    return usersMap[userId] || "Usuario Desconocido";
+  };
+
   const getPaymentMethodIcon = (method: string) => {
     switch (method) {
       case "cash": return <Banknote className="h-4 w-4 text-green-600" />;
@@ -108,9 +167,15 @@ const TicketsPage: React.FC = () => {
     setCreateTicketOpen(true);
   };
 
+  const handleDeleteTicket = (id: number) => {
+    deleteTicketMutation.mutate(id);
+  };
+
   const handleExportTickets = async () => {
     try {
-      const csvContent = await TicketManager.exportTicketsToCSV();
+      // Export based on role permissions
+      const csvContent = await TicketManager.exportTicketsToCSV(user?.role === 'cashier');
+      
       if (csvContent === "No tickets to export") {
         toast({
           title: "Sin datos",
@@ -195,31 +260,46 @@ const TicketsPage: React.FC = () => {
         </div>
         
         <div className="flex gap-2">
-          <Button 
-            onClick={handleExportTickets} 
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" /> Exportar
-          </Button>
-          <Button 
-            onClick={handleCreateDeposit} 
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <ArrowDown className="mr-1 h-4 w-4" /> Depósito
-          </Button>
-          <Button 
-            onClick={handleCreateWithdrawal}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            <ArrowUp className="mr-1 h-4 w-4" /> Retiro
-          </Button>
+          {(hasPermission('export_all_tickets') || hasPermission('export_today_tickets')) && (
+            <Button 
+              onClick={handleExportTickets} 
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" /> 
+              {user?.role === 'cashier' ? 'Exportar (Hoy)' : 'Exportar'}
+            </Button>
+          )}
+          
+          {hasPermission('create_tickets') && (
+            <>
+              <Button 
+                onClick={handleCreateDeposit} 
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <ArrowDown className="mr-1 h-4 w-4" /> Depósito
+              </Button>
+              <Button 
+                onClick={handleCreateWithdrawal}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <ArrowUp className="mr-1 h-4 w-4" /> Retiro
+              </Button>
+            </>
+          )}
         </div>
       </div>
       
+      {user?.role === 'cashier' && (
+        <div className="bg-blue-50 dark:bg-blue-950 rounded-md p-3 text-blue-700 dark:text-blue-300 text-sm flex items-center">
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          Como cajero, solo puedes ver las boletas de hoy.
+        </div>
+      )}
+      
       <Card>
         <CardContent className="p-0">
-          {isLoadingTickets || isLoadingClients ? (
+          {isLoadingTickets || isLoadingClients || isLoadingUsers ? (
             <div className="flex justify-center items-center p-8">
               <Loader2 className="animate-spin h-8 w-8 text-primary mr-2" />
               <span>Cargando boletas...</span>
@@ -234,6 +314,7 @@ const TicketsPage: React.FC = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Método de Pago</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
+                  {user?.role === 'admin' && <TableHead>Creado Por</TableHead>}
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -278,18 +359,52 @@ const TicketsPage: React.FC = () => {
                       }`}>
                         {ticket.type === "Deposit" ? "+" : "-"}${ticket.amount.toLocaleString()}
                       </TableCell>
+                      {user?.role === 'admin' && (
+                        <TableCell className="text-xs text-muted-foreground">
+                          {getUserName(ticket.createdBy)}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link to={`/clients/${ticket.clientId}`}>
-                            Ver Cliente
-                          </Link>
-                        </Button>
+                        <div className="flex justify-end items-center gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                            <Link to={`/clients/${ticket.clientId}`}>
+                              Ver Cliente
+                            </Link>
+                          </Button>
+                          
+                          {hasPermission('manage_tickets') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button size="icon" variant="destructive">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>¿Eliminar esta boleta?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Esta acción no se puede deshacer. La boleta se eliminará permanentemente.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleDeleteTicket(ticket.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Eliminar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
+                    <TableCell colSpan={user?.role === 'admin' ? 8 : 7} className="text-center py-6">
                       {tickets.length === 0 
                         ? "No hay boletas registradas aún" 
                         : "No hay boletas que coincidan con tu búsqueda"}
@@ -306,6 +421,7 @@ const TicketsPage: React.FC = () => {
         open={createTicketOpen} 
         onOpenChange={setCreateTicketOpen}
         defaultType={ticketType}
+        userId={user?.id}
       />
     </div>
   );

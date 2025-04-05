@@ -12,11 +12,17 @@ export interface Client {
 }
 
 export class ClientManager {
-  static async getAllClients(): Promise<Client[]> {
-    const { data, error } = await supabase
+  static async getAllClients(activeOnly: boolean = false): Promise<Client[]> {
+    let query = supabase
       .from('clients')
       .select('*')
       .order('name');
+      
+    if (activeOnly) {
+      query = query.eq('active', true);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching clients:", error);

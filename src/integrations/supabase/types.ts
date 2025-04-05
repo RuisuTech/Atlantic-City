@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_users: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          password_hash: string
+          role: Database["public"]["Enums"]["user_role"]
+          username: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          password_hash: string
+          role?: Database["public"]["Enums"]["user_role"]
+          username: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          password_hash?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          username?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           active: boolean
@@ -42,30 +69,39 @@ export type Database = {
           client_id: number
           code: string
           created_at: string
+          created_by: string | null
           date: string
           id: number
           payment_method: string
           type: string
+          updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           amount: number
           client_id: number
           code?: string
           created_at?: string
+          created_by?: string | null
           date?: string
           id?: number
           payment_method?: string
           type: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           amount?: number
           client_id?: number
           code?: string
           created_at?: string
+          created_by?: string | null
           date?: string
           id?: number
           payment_method?: string
           type?: string
+          updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -73,6 +109,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "app_users"
             referencedColumns: ["id"]
           },
         ]
@@ -85,7 +135,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      user_role: "admin" | "cashier"
     }
     CompositeTypes: {
       [_ in never]: never
