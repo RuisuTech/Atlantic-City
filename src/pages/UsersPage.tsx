@@ -60,7 +60,7 @@ const UsersPage: React.FC = () => {
 
   // Add user mutation
   const addUserMutation = useMutation({
-    mutationFn: async (userData: Omit<AppUser, 'id' | 'created_at'> & { password: string }) => {
+    mutationFn: async (userData: { username: string; password: string; role: UserRole; active: boolean }) => {
       // Hash the password before saving to the database
       const password_hash = await hashPassword(userData.password);
       
@@ -96,11 +96,12 @@ const UsersPage: React.FC = () => {
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: Partial<AppUser> & { password?: string }) => {
-      const updateData: any = {};
-      if (userData.username) updateData.username = userData.username;
-      if (userData.role) updateData.role = userData.role;
-      if (userData.active !== undefined) updateData.active = userData.active;
+    mutationFn: async (userData: { id: string; username: string; password?: string; role: UserRole; active: boolean }) => {
+      const updateData: any = {
+        username: userData.username,
+        role: userData.role,
+        active: userData.active
+      };
       
       // If a new password is provided, hash it
       if (userData.password && userData.password.trim() !== '') {
