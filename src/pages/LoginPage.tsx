@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from "@/contexts/AuthContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldCheck, User, KeyRound, Loader2, UserPlus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, UserRole } from "@/integrations/supabase/client";
 import { hashPassword } from "@/utils/password";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +25,7 @@ const LoginPage: React.FC = () => {
     username: "",
     password: "",
     confirmPassword: "",
-    role: "cashier" // Default role
+    role: "cashier" as UserRole // Fixed: explicitly type as UserRole
   });
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -49,7 +49,7 @@ const LoginPage: React.FC = () => {
     setRegisterForm(prev => ({ ...prev, [name]: value }));
   };
   
-  const handleRoleChange = (value: string) => {
+  const handleRoleChange = (value: UserRole) => {
     setRegisterForm(prev => ({ ...prev, role: value }));
   };
 
@@ -96,7 +96,7 @@ const LoginPage: React.FC = () => {
         .insert({
           username: registerForm.username,
           password_hash,
-          role: registerForm.role, // Usar el rol seleccionado
+          role: registerForm.role, // Now correctly typed as UserRole
           active: true
         });
         
@@ -113,7 +113,7 @@ const LoginPage: React.FC = () => {
         username: "",
         password: "",
         confirmPassword: "",
-        role: "cashier"
+        role: "cashier" as UserRole
       });
       
       // Establecer los valores para el login
@@ -249,7 +249,7 @@ const LoginPage: React.FC = () => {
                   <Label htmlFor="reg-role">Rol de Usuario</Label>
                   <Select 
                     value={registerForm.role} 
-                    onValueChange={handleRoleChange}
+                    onValueChange={(value: string) => handleRoleChange(value as UserRole)}
                   >
                     <SelectTrigger id="reg-role">
                       <SelectValue placeholder="Seleccione un rol" />
