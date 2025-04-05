@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth, UserRole } from '@/contexts/AuthContext';
+import { supabase, UserRole, AppUser } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,14 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Loader2, Plus, Shield, User, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-interface AppUser {
-  id: string;
-  username: string;
-  role: UserRole;
-  active: boolean;
-  created_at: string;
-}
 
 const UsersPage: React.FC = () => {
   const { user, hasPermission } = useAuth();
@@ -67,7 +58,7 @@ const UsersPage: React.FC = () => {
 
   // Add user mutation
   const addUserMutation = useMutation({
-    mutationFn: async (userData: Omit<AppUser, 'id' | 'created_at'> & { password: string }) => {
+    mutationFn: async (userData: Omit<AppUser, 'id' | 'created_at'>) => {
       // For simplicity, we're not actually hashing the password here
       // In a real app, you would hash it properly
       const { error } = await supabase

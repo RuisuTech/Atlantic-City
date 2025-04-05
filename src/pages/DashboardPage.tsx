@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Receipt, TrendingUp, CircleDollarSign, Loader2 } from "lucide-react";
@@ -6,15 +5,20 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } fro
 import { useQuery } from "@tanstack/react-query";
 import { ClientManager } from "@/models/Client";
 import { TicketManager, Ticket } from "@/models/Ticket";
+import { useAuth } from "@/hooks/auth";
 
 const DashboardPage: React.FC = () => {
-  // Fetch clients
+  const { user, hasPermission } = useAuth();
+
+  // Fetch active clients
   const { 
-    data: clients = [], 
+    data: activeClients = [], 
     isLoading: isLoadingClients 
   } = useQuery({
-    queryKey: ['clients'],
-    queryFn: ClientManager.getAllClients
+    queryKey: ['clientsDashboard', 'active'],
+    queryFn: async () => {
+      return ClientManager.getAllClients(true);
+    }
   });
 
   // Fetch tickets
@@ -34,17 +38,17 @@ const DashboardPage: React.FC = () => {
     queryKey: ['clientBalances'],
     queryFn: async () => {
       const balances: Record<number, number> = {};
-      for (const client of clients) {
+      for (const client of activeClients) {
         balances[client.id] = await TicketManager.getBalanceByClientId(client.id);
       }
       return balances;
     },
-    enabled: clients.length > 0
+    enabled: activeClients.length > 0
   });
 
   // Prepare stats
-  const clientCount = clients.length;
-  const activeClientCount = clients.filter(c => c.active).length;
+  const clientCount = activeClients.length;
+  const activeClientCount = activeClients.filter(c => c.active).length;
   const ticketCount = tickets.length;
   
   // Calculate total balance

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CreateTicketDialog } from "@/components/tickets/CreateTicketDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 const TicketsPage: React.FC = () => {
@@ -28,10 +28,8 @@ const TicketsPage: React.FC = () => {
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
 
-  // Determine if we should show only today's tickets based on permissions
   const showOnlyToday = user?.role === 'cashier';
 
-  // Fetch tickets based on role
   const { 
     data: tickets = [], 
     isLoading: isLoadingTickets,
@@ -41,7 +39,6 @@ const TicketsPage: React.FC = () => {
     queryFn: () => showOnlyToday ? TicketManager.getTodayTickets() : TicketManager.getAllTickets()
   });
 
-  // Fetch all clients for name lookups
   const { 
     data: clientsMap = {}, 
     isLoading: isLoadingClients 
@@ -56,14 +53,12 @@ const TicketsPage: React.FC = () => {
     }
   });
 
-  // Fetch user data for displaying creators
   const { 
     data: usersMap = {}, 
     isLoading: isLoadingUsers 
   } = useQuery({
     queryKey: ['usersMap'],
     queryFn: async () => {
-      // Only fetch users if user is admin
       if (user?.role !== 'admin') return {};
       
       const { data, error } = await supabase
@@ -83,7 +78,6 @@ const TicketsPage: React.FC = () => {
     enabled: user?.role === 'admin'
   });
 
-  // Delete ticket mutation
   const deleteTicketMutation = useMutation({
     mutationFn: TicketManager.deleteTicket,
     onSuccess: () => {
@@ -103,15 +97,12 @@ const TicketsPage: React.FC = () => {
     }
   });
 
-  // Filter and sort tickets
   const filteredTickets = tickets.filter(ticket => {
-    // Apply type filter
     if (filterType !== "all") {
       const ticketType = filterType === "deposit" ? "Deposit" : "Withdrawal";
       if (ticket.type !== ticketType) return false;
     }
     
-    // Apply search filter (by client name or ticket code)
     if (searchTerm.trim()) {
       const clientName = clientsMap[ticket.clientId] || "";
       const ticketCode = ticket.code || "";
@@ -173,7 +164,6 @@ const TicketsPage: React.FC = () => {
 
   const handleExportTickets = async () => {
     try {
-      // Export based on role permissions
       const csvContent = await TicketManager.exportTicketsToCSV(user?.role === 'cashier');
       
       if (csvContent === "No tickets to export") {
@@ -185,7 +175,6 @@ const TicketsPage: React.FC = () => {
         return;
       }
 
-      // Create blob and download
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
@@ -421,7 +410,6 @@ const TicketsPage: React.FC = () => {
         open={createTicketOpen} 
         onOpenChange={setCreateTicketOpen}
         defaultType={ticketType}
-        userId={user?.id}
       />
     </div>
   );

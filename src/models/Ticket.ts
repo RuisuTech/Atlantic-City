@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export type TicketType = "Deposit" | "Withdrawal";
@@ -225,10 +224,9 @@ export class TicketManager {
           const { data } = await supabase
             .from('app_users')
             .select('username')
-            .eq('id', ticket.createdBy)
-            .single();
+            .eq('id', ticket.createdBy);
           
-          if (data) creatorName = data.username;
+          if (data && data.length > 0) creatorName = data[0].username;
         } catch (error) {
           console.error("Error fetching creator name:", error);
         }

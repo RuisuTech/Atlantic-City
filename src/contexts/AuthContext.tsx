@@ -1,9 +1,7 @@
 
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-
-export type UserRole = "admin" | "cashier";
+import { supabase, UserRole, AppUser } from "@/integrations/supabase/client";
 
 interface User {
   id: string;
@@ -132,3 +130,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+export type { UserRole };
