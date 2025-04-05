@@ -5,7 +5,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } fro
 import { useQuery } from "@tanstack/react-query";
 import { ClientManager } from "@/models/Client";
 import { TicketManager, Ticket } from "@/models/Ticket";
-import { useAuth } from "@/hooks/auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const DashboardPage: React.FC = () => {
   const { user, hasPermission } = useAuth();

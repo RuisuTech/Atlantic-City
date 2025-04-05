@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, UserRole, AppUser } from '@/integrations/supabase/client';
@@ -24,7 +25,7 @@ const UsersPage: React.FC = () => {
   
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
+    password_hash: '', // Changed from password to password_hash to match AppUser type
     role: 'cashier' as UserRole,
     active: true
   });
@@ -65,7 +66,7 @@ const UsersPage: React.FC = () => {
         .from('app_users')
         .insert({
           username: userData.username,
-          password_hash: `dummy_hash_for_${userData.password}`, // This is just a dummy implementation
+          password_hash: userData.password_hash, // Updated to use password_hash
           role: userData.role,
           active: userData.active
         });
@@ -163,7 +164,7 @@ const UsersPage: React.FC = () => {
     setEditingUser(null);
     setFormData({
       username: '',
-      password: '',
+      password_hash: '', // Changed from password to password_hash
       role: 'cashier',
       active: true
     });
@@ -174,7 +175,7 @@ const UsersPage: React.FC = () => {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      password: '',  // We don't show the password when editing
+      password_hash: '',  // We don't show the password when editing
       role: user.role,
       active: user.active
     });
@@ -207,7 +208,7 @@ const UsersPage: React.FC = () => {
       });
     } else {
       // Add new user - check required fields
-      if (!formData.username || !formData.password) {
+      if (!formData.username || !formData.password_hash) { // Changed from password to password_hash
         toast({
           title: "Campos requeridos",
           description: "El nombre de usuario y contraseña son obligatorios",
@@ -234,7 +235,7 @@ const UsersPage: React.FC = () => {
       // Add user
       addUserMutation.mutate({
         username: formData.username,
-        password: formData.password,
+        password_hash: formData.password_hash, // Changed from password to password_hash
         role: formData.role,
         active: formData.active
       });
@@ -377,13 +378,13 @@ const UsersPage: React.FC = () => {
               
               {!editingUser && (
                 <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
+                  <Label htmlFor="password_hash">Contraseña</Label>
                   <Input
-                    id="password"
-                    name="password"
+                    id="password_hash"
+                    name="password_hash"
                     type="password"
                     placeholder="••••••••"
-                    value={formData.password}
+                    value={formData.password_hash}
                     onChange={handleInputChange}
                     required={!editingUser}
                   />
