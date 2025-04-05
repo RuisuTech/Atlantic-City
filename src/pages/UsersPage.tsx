@@ -385,20 +385,18 @@ const UsersPage: React.FC = () => {
                 />
               </div>
               
-              {!editingUser && (
-                <div className="space-y-2">
-                  <Label htmlFor="password_hash">Contraseña</Label>
-                  <Input
-                    id="password_hash"
-                    name="password_hash"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password_hash}
-                    onChange={handleInputChange}
-                    required={!editingUser}
-                  />
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required={!editingUser}
+                />
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="role">Rol</Label>
