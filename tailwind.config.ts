@@ -54,7 +54,7 @@ export default {
 					foreground: "hsl(var(--card-foreground))"
 				},
 				casino: {
-					purple: "#4A148C",
+					blue: "#0075FF",
 					gold: "#FFD700",
 					red: "#B71C1C",
 					green: "#1B5E20",
