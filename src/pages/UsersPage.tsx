@@ -13,20 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Shield, Trash2, User, UserCog } from 'lucide-react';
+import { Loader2, Plus, Shield, User, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { hashPassword } from '@/utils/password';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 const UsersPage: React.FC = () => {
   const { user, hasPermission } = useAuth();
@@ -179,34 +168,6 @@ const UsersPage: React.FC = () => {
     }
   });
 
-  // Delete user mutation
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from('app_users')
-        .delete()
-        .eq('id', userId);
-        
-      if (error) throw error;
-      return true;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['app_users'] });
-      toast({
-        title: "Usuario eliminado",
-        description: "El usuario ha sido eliminado correctamente"
-      });
-    },
-    onError: (error) => {
-      console.error("Error deleting user:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el usuario",
-        variant: "destructive"
-      });
-    }
-  });
-
   const openAddDialog = () => {
     setEditingUser(null);
     setFormData({
@@ -304,20 +265,6 @@ const UsersPage: React.FC = () => {
     toggleUserStatusMutation.mutate(userId);
   };
 
-  const deleteUser = (userId: string) => {
-    // Don't allow deleting yourself
-    if (userId === user.id) {
-      toast({
-        title: "Acción no permitida",
-        description: "No puedes eliminar tu propia cuenta",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    deleteUserMutation.mutate(userId);
-  };
-
   if (usersError) {
     return (
       <div className="p-6 text-center">
@@ -384,45 +331,16 @@ const UsersPage: React.FC = () => {
                         />
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end items-center gap-2">
-                          <Button
-                            onClick={() => openEditDialog(appUser)}
-                            variant="outline"
-                            size="sm"
-                            className="flex items-center gap-2"
-                            disabled={updateUserMutation.isPending}
-                          >
-                            <UserCog className="h-4 w-4" />
-                            <span>Editar</span>
-                          </Button>
-                          
-                          {appUser.id !== user.id && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button size="icon" variant="destructive">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>¿Eliminar este usuario?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Esta acción eliminará permanentemente al usuario. Esta acción no se puede deshacer.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction 
-                                    onClick={() => deleteUser(appUser.id)}
-                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                  >
-                                    Eliminar
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </div>
+                        <Button
+                          onClick={() => openEditDialog(appUser)}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                          disabled={updateUserMutation.isPending}
+                        >
+                          <UserCog className="h-4 w-4" />
+                          <span>Editar</span>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
