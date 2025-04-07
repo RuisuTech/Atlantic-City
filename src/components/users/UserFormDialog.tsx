@@ -1,14 +1,23 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, UserRole, AppUser } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { hashPassword } from '@/utils/password';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Dialog,
   DialogContent,
@@ -24,12 +33,26 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { Switch } from '@/components/ui/switch';
 
 interface UserFormDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   editingUser: AppUser | null;
 }
+
+// Define schema for form validation
+const createUserSchema = z.object({
+  username: z.string().min(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' }),
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
+  role: z.enum(['admin', 'cashier']),
+  active: z.boolean().default(true)
+});
+
+// Schema for editing - password is optional
+const editUserSchema = createUserSchema.extend({
+  password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }).optional().or(z.literal(''))
+});
 
 const UserFormDialog: React.FC<UserFormDialogProps> = ({
   isOpen,
@@ -39,35 +62,52 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    role: 'cashier' as UserRole,
-    active: true
+  // Determine which schema to use based on editingUser
+  const formSchema = editingUser ? editUserSchema : createUserSchema;
+  
+  // Initialize react-hook-form
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+      role: 'cashier' as UserRole,
+      active: true
+    }
   });
 
-  // Reset form when editing user changes
+  // Reset form values when editingUser changes
   useEffect(() => {
     if (editingUser) {
-      setFormData({
+      form.reset({
         username: editingUser.username,
-        password: '',  // We don't show the password when editing
+        password: '', // Password is empty when editing
         role: editingUser.role,
         active: editingUser.active
       });
     } else {
-      setFormData({
+      form.reset({
         username: '',
         password: '',
         role: 'cashier',
         active: true
       });
     }
-  }, [editingUser, isOpen]);
+  }, [editingUser, isOpen, form]);
 
   // Add user mutation
   const addUserMutation = useMutation({
-    mutationFn: async (userData: { username: string; password: string; role: UserRole; active: boolean }) => {
+    mutationFn: async (userData: z.infer<typeof createUserSchema>) => {
+      // Check username uniqueness
+      const { data } = await supabase
+        .from('app_users')
+        .select('id')
+        .eq('username', userData.username);
+        
+      if (data && data.length > 0) {
+        throw new Error('Este nombre de usuario ya está en uso');
+      }
+      
       // Hash the password before saving to the database
       const password_hash = await hashPassword(userData.password);
       
@@ -93,17 +133,25 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
     },
     onError: (error) => {
       console.error("Error adding user:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo agregar el usuario",
-        variant: "destructive"
-      });
+      if (error instanceof Error) {
+        toast({
+          title: "Error",
+          description: error.message || "No se pudo agregar el usuario",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo agregar el usuario",
+          variant: "destructive"
+        });
+      }
     }
   });
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: { id: string; username: string; password?: string; role: UserRole; active: boolean }) => {
+    mutationFn: async (userData: z.infer<typeof editUserSchema> & { id: string }) => {
       const updateData: any = {
         username: userData.username,
         role: userData.role,
@@ -141,64 +189,15 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
     }
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleRoleChange = (value: string) => {
-    setFormData(prev => ({ ...prev, role: value as UserRole }));
-  };
-
-  const handleSwitchChange = (checked: boolean) => {
-    setFormData(prev => ({ ...prev, active: checked }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Form submission handler
+  const onSubmit = (data: z.infer<typeof formSchema>) => {
     if (editingUser) {
-      // Update existing user
       updateUserMutation.mutate({
         id: editingUser.id,
-        username: formData.username,
-        role: formData.role,
-        active: formData.active,
-        password: formData.password // Only update password if provided
+        ...data
       });
     } else {
-      // Add new user - check required fields
-      if (!formData.username || !formData.password) {
-        toast({
-          title: "Campos requeridos",
-          description: "El nombre de usuario y contraseña son obligatorios",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Check username uniqueness
-      const { data } = await supabase
-        .from('app_users')
-        .select('id')
-        .eq('username', formData.username);
-        
-      if (data && data.length > 0) {
-        toast({
-          title: "Usuario existente",
-          description: "Este nombre de usuario ya está en uso",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Add user
-      addUserMutation.mutate({
-        username: formData.username,
-        password: formData.password,
-        role: formData.role,
-        active: formData.active
-      });
+      addUserMutation.mutate(data as z.infer<typeof createUserSchema>);
     }
   };
 
@@ -217,74 +216,103 @@ const UserFormDialog: React.FC<UserFormDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Nombre de Usuario</Label>
-              <Input
-                id="username"
-                name="username"
-                placeholder="usuario123"
-                value={formData.username}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleInputChange}
-                required={!editingUser}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="role">Rol</Label>
-              <Select 
-                value={formData.role} 
-                onValueChange={handleRoleChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar rol" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrador</SelectItem>
-                  <SelectItem value="cashier">Cajero</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch 
-                id="active" 
-                checked={formData.active}
-                onCheckedChange={handleSwitchChange}
-              />
-              <Label htmlFor="active">Usuario activo</Label>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button 
-              type="submit"
-              disabled={addUserMutation.isPending || updateUserMutation.isPending}
-            >
-              {(addUserMutation.isPending || updateUserMutation.isPending) && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre de Usuario</FormLabel>
+                  <FormControl>
+                    <Input placeholder="usuario123" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )}
-              {editingUser ? "Guardar Cambios" : "Crear Usuario"}
-            </Button>
-          </DialogFooter>
-        </form>
+            />
+            
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {editingUser ? "Contraseña (dejar en blanco para mantener)" : "Contraseña"}
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="role"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Rol</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar rol" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="cashier">Cajero</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="active"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                  <div className="space-y-0.5">
+                    <FormLabel>Usuario activo</FormLabel>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            
+            <DialogFooter>
+              <Button 
+                type="submit"
+                disabled={addUserMutation.isPending || updateUserMutation.isPending}
+              >
+                {(addUserMutation.isPending || updateUserMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                {editingUser ? "Guardar Cambios" : "Crear Usuario"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
 };
 
 export default UserFormDialog;
+
