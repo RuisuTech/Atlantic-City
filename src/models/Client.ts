@@ -79,6 +79,7 @@ export class ClientManager {
 
     if (error) {
       console.error("Error updating client:", error);
+      throw error;
     }
   }
 

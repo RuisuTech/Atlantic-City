@@ -1,16 +1,17 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ClientManager, Client } from "@/models/Client";
-import { Search, User, UserPlus, UserX } from "lucide-react";
-import { Link, Navigate } from "react-router-dom";
+import { Search, User, UserPlus, Edit, UserX } from "lucide-react";
+import { Navigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import ClientFormDialog from "@/components/clients/ClientFormDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,8 @@ import {
 
 const ClientsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { toast } = useToast();
   const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -80,14 +83,22 @@ const ClientsPage: React.FC = () => {
     toggleClientStatusMutation.mutate(id);
   };
 
+  const openAddDialog = () => {
+    setEditingClient(null);
+    setIsDialogOpen(true);
+  };
+
+  const openEditDialog = (client: Client) => {
+    setEditingClient(client);
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Gestión de Clientes</h1>
-        <Button asChild>
-          <Link to="/clients/new" className="flex items-center gap-2">
-            <UserPlus className="h-4 w-4" /> Agregar Cliente
-          </Link>
+        <Button onClick={openAddDialog} className="flex items-center gap-2">
+          <UserPlus className="h-4 w-4" /> Agregar Cliente
         </Button>
       </div>
       
@@ -127,10 +138,8 @@ const ClientsPage: React.FC = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end items-center gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/clients/${client.id}`}>
-                          Ver Detalles
-                        </Link>
+                      <Button variant="outline" size="sm" onClick={() => openEditDialog(client)}>
+                        <Edit className="h-4 w-4 mr-1" /> Editar
                       </Button>
                       
                       {hasPermission('manage_clients') && (
@@ -167,6 +176,12 @@ const ClientsPage: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <ClientFormDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingClient={editingClient}
+      />
     </div>
   );
 };
