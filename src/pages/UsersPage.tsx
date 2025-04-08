@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Loader2, Plus, Shield, User, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { hashPassword } from '@/utils/password';
 
 const UsersPage: React.FC = () => {
   const { user, hasPermission } = useAuth();
@@ -25,7 +26,7 @@ const UsersPage: React.FC = () => {
   
   const [formData, setFormData] = useState({
     username: '',
-    password_hash: '', // Changed from password to password_hash to match AppUser type
+    password: '',
     role: 'cashier' as UserRole,
     active: true
   });
@@ -59,14 +60,15 @@ const UsersPage: React.FC = () => {
 
   // Add user mutation
   const addUserMutation = useMutation({
-    mutationFn: async (userData: Omit<AppUser, 'id' | 'created_at'>) => {
-      // For simplicity, we're not actually hashing the password here
-      // In a real app, you would hash it properly
+    mutationFn: async (userData: Omit<AppUser, 'id' | 'created_at'> & { password: string }) => {
+      // Hash the password before saving to the database
+      const password_hash = await hashPassword(userData.password);
+      
       const { error } = await supabase
         .from('app_users')
         .insert({
           username: userData.username,
-          password_hash: userData.password_hash, // Updated to use password_hash
+          password_hash,
           role: userData.role,
           active: userData.active
         });
@@ -94,11 +96,16 @@ const UsersPage: React.FC = () => {
 
   // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: Partial<AppUser>) => {
+    mutationFn: async (userData: Partial<AppUser> & { password?: string }) => {
       const updateData: any = {};
       if (userData.username) updateData.username = userData.username;
       if (userData.role) updateData.role = userData.role;
       if (userData.active !== undefined) updateData.active = userData.active;
+      
+      // If a new password is provided, hash it
+      if (userData.password && userData.password.trim() !== '') {
+        updateData.password_hash = await hashPassword(userData.password);
+      }
       
       const { error } = await supabase
         .from('app_users')
@@ -164,7 +171,7 @@ const UsersPage: React.FC = () => {
     setEditingUser(null);
     setFormData({
       username: '',
-      password_hash: '', // Changed from password to password_hash
+      password: '',
       role: 'cashier',
       active: true
     });
@@ -175,7 +182,7 @@ const UsersPage: React.FC = () => {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      password_hash: '',  // We don't show the password when editing
+      password: '',  // We don't show the password when editing
       role: user.role,
       active: user.active
     });
@@ -204,11 +211,12 @@ const UsersPage: React.FC = () => {
         id: editingUser.id,
         username: formData.username,
         role: formData.role,
-        active: formData.active
+        active: formData.active,
+        password: formData.password // Only update password if provided
       });
     } else {
       // Add new user - check required fields
-      if (!formData.username || !formData.password_hash) { // Changed from password to password_hash
+      if (!formData.username || !formData.password) {
         toast({
           title: "Campos requeridos",
           description: "El nombre de usuario y contraseña son obligatorios",
@@ -235,7 +243,7 @@ const UsersPage: React.FC = () => {
       // Add user
       addUserMutation.mutate({
         username: formData.username,
-        password_hash: formData.password_hash, // Changed from password to password_hash
+        password: formData.password,
         role: formData.role,
         active: formData.active
       });
